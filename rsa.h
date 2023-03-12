@@ -7,21 +7,21 @@ class RSA
 {
 public:
     struct Key {
-        int firstNumber;
-        int SecondNumber;
+        long int firstNumber;
+        long int SecondNumber;
     };
 
     RSA();
     ~RSA();
 
     void generateKey(int p, int q);
-    void encrypt(char* buffer, const int bufSize);
-    void decrypt(char* buffer, const int bufSize);
+    void encrypt(char *rbuffer, long long int *wbuffer, const int bufSize);
+    void decrypt(long long int *rbuffer, char *wbuffer, const int bufSize);
     Key getPublicKey() const { return publicKey; }
     Key getPrivateKey() const { return privateKey; }
 
 private:
-    int p, q, n, e, d;
+    long long int p, q, n, e, d;
     Key publicKey;
     Key privateKey;
 };
