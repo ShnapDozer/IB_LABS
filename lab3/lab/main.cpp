@@ -1,58 +1,9 @@
 #include <QCoreApplication>
 #include <QDebug>
+
 #include <iostream>
-
-//typedef unsigned long DWORD; // Двойное слово - 32 бита (разряда)
-//typedef unsigned int WORD; // Слово - 16 бит (разрядов)
-//typedef signed long LONG;
-//typedef unsigned int UINT;
-
-//// Заголовок файла
-//typedef struct tagBITMAPFILEHEADER {
-//    WORD bfType; // 'BM' = 4D42h
-//    DWORD bfSize;
-//    WORD bfReserved1;
-//    WORD bfReserved2;
-//    DWORD bfOffBits; // Смещение к растру
-//} BITMAPFILEHEADER;
-
-//// Заголовок Bitmap
-//typedef struct tagBITMAPINFOHEADER {
-//    DWORD biSize;
-//    LONG biWidth;
-//    LONG biHeight;
-//    WORD biPlanes;
-//    WORD biBitCount;
-//    DWORD biCompression;
-//    DWORD biSizeImage;
-//    LONG biXPelsPerMeter;
-//    LONG biYPelsPerMeter;
-//    DWORD biClrUsed;
-//    DWORD biClrImportant;
-//} BITMAPINFOHEADER;
-
-
-
 #include <fstream>
 #include <vector>
-
-struct BMPHeader {
-    uint16_t type;
-    uint32_t size;
-    uint32_t reserved;
-    uint32_t offset;
-    uint32_t dib_size;
-    int32_t width;
-    int32_t height;
-    uint16_t planes;
-    uint16_t bpp;
-    uint32_t compression;
-    uint32_t image_size;
-    int32_t x_ppm;
-    int32_t y_ppm;
-    uint32_t colors;
-    uint32_t important;
-};
 
 struct RGBQUAD {
     char rgbBlue;
@@ -61,35 +12,72 @@ struct RGBQUAD {
     char rgbReserved;
 };
 
+typedef uint32_t DWORD; // Двойное слово - 32 бита (разряда)
+typedef uint16_t WORD; // Слово - 16 бит (разрядов)
+typedef int32_t LONG;
+
+struct BMPHeader {
+    WORD type;
+    DWORD size;
+    DWORD reserved;
+    DWORD offset;
+    DWORD dib_size;
+    LONG width;
+    LONG height;
+    WORD planes;
+    WORD bpp;
+    DWORD compression;
+    DWORD image_size;
+    LONG x_ppm;
+    LONG y_ppm;
+    DWORD colors;
+    DWORD important;
+};
+
 struct BMP_file {
-    std::string filePath;
+    std::string path;
     BMPHeader header;
-    std::vector<RGBQUAD> data;
+    LONG dataSize;
+    RGBQUAD* data;
 };
 
 BMP_file read_bmp_file(const std::string& filename) {
 
     BMP_file retFile;
-    retFile.filePath= filename;
-    std::ifstream file(filename, std::ios::binary);
+    retFile.path = filename;
+
+    FILE* inStream = fopen(retFile.path.c_str(), "rb");
+    if (!inStream) {
+        printf("Error: could not open file %s\n", retFile.path.c_str());
+        return BMP_file();
+    }
 
     // Read BMP header
-    file.read(reinterpret_cast<char*>(&retFile.header), sizeof(retFile.header));
+    fread(&retFile.header, sizeof(BMPHeader), 1, inStream);
 
-    // Check if file is BMP
-    if (retFile.header.type != 0x4D42) {
-        throw std::runtime_error("File is not BMP");
-    }
+    retFile.header.offset = retFile.header.offset / 8;
 
     // Read BMP data
-    char* buffer = new char[retFile.header.image_size];
-    file.seekg(retFile.header.offset, std::ios::beg);
-    file.read(buffer, sizeof(buffer));
+    retFile.dataSize = retFile.header.image_size / (4 * 8);
+    retFile.data = new RGBQUAD[retFile.dataSize];
 
-    std::cout << retFile.header.image_size << std::endl;
-    for(int i = 0; i < retFile.header.image_size; i += 4) {
-        retFile.data.push_back({buffer[i], buffer[i+1], buffer[i+2], buffer[i+3]});
+    if(fseek(inStream, retFile.header.offset, SEEK_SET)){
+        printf("Error: could not seek to RGBQUAD section offset: %i\n", retFile.header.offset);
+        return BMP_file();
     }
+
+    int readBytes = -1;
+    readBytes = fread(retFile.data, sizeof(RGBQUAD), retFile.dataSize, inStream);
+
+
+    if(readBytes <= 0) {
+        printf("Error: could not read RGBQUAD section RB: %i  OS: %i\n", readBytes, retFile.dataSize);
+        return BMP_file();
+    }
+
+    retFile.dataSize = readBytes;
+
+    fclose(inStream);
 
     return retFile;
 }
@@ -105,20 +93,38 @@ void hide_byte_into_pixel(RGBQUAD *pixel, uint8_t hide_byte) {
     pixel->rgbReserved |= (hide_byte) & 0x3;
 }
 
-void write_hide_bmp_file(BMP_file file){
-    std::ofstream wStream(file.filePath, std::ios::binary);
-    wStream.write(reinterpret_cast<const char*>(&file.header), sizeof(BMPHeader));
-    wStream.write(reinterpret_cast<const char*>(file.data.data()), sizeof(RGBQUAD) * file.data.size());
-    wStream.close();
+uint8_t read_hidden_byte(const RGBQUAD &pixel) {
+     uint8_t hiddenByte = ((pixel.rgbRed & 0x3) << 6)
+                         | ((pixel.rgbGreen & 0x3) << 4)
+                         | ((pixel.rgbBlue & 0x3) << 2);
+
+     return hiddenByte;
 }
+
+void write_bmp_file(BMP_file file){
+    FILE* outStream = fopen(file.path.c_str(), "wb");
+    if(!outStream) {
+        printf("Error: could not open file %s\n", file.path.c_str());
+        return;
+    }
+
+    fwrite(&file.header, sizeof(BMPHeader), 1, outStream);
+    fwrite(file.data, sizeof(RGBQUAD), file.dataSize, outStream);
+
+
+    fclose(outStream);
+}
+
 
 int main(int argc, char *argv[])
 {
-    auto r = read_bmp_file("./pic.bmp");
-    r.filePath = "./pic1.bmp";
+    auto r = read_bmp_file("./6.bmp");
+    for(int i = 0; i < r.dataSize; ++i) {
+        std::cout << read_hidden_byte(r.data[i]);
+    }
 
-    write_hide_bmp_file(r);
+    write_bmp_file(r);
 
-    std::cout << r.data.size() << std::endl;
+//    std::cout << r.dataSize << " " << sizeof(RGBQUAD) <<  std::endl;
     return 0;
 }
