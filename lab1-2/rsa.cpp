@@ -1,6 +1,8 @@
 #include "rsa.h"
+
 #include <iostream>
 #include <cmath>
+#include <QDebug>
 
 RSA::RSA() : p(-1), q(-1), n(-1)
 {
@@ -39,20 +41,19 @@ void RSA::generateKey(int p, int q)
     }
 }
 
-void RSA::encrypt(char *buffer, const int bufSize)
+
+// Есть проблема с шифрованием тк появляются очень большие степени, которые не укладываются в long long int и другие классы,
+// поэтому шифрование потока байтов на данный момент недоступна из-за сложностей с длинной арифметикой.
+void RSA::encrypt(char *rbuffer, long long int *wbuffer, const int bufSize)
 {
     for(int i = 0; i < bufSize; ++i) {
-        buffer[i] = char(((int)pow(buffer[i], e)) % n);
-        std::cout << ((int)pow(buffer[i], e)) % n << " ";
+        wbuffer[i] = ((long long int)pow(rbuffer[i], e)) % n;
     }
-    std::cout << std::endl;
 }
 
-void RSA::decrypt(char *buffer, const int bufSize)
+void RSA::decrypt(long long int *rbuffer, char *wbuffer, const int bufSize)
 {
     for(int i = 0; i < bufSize; ++i) {
-        buffer[i] = char(((int)pow(buffer[i], d)) % n);
-        std::cout << ((int)pow(buffer[i], e)) % n << " ";
+        wbuffer[i] = char(((long long int)pow(rbuffer[i], d)) % n);
     }
-    std::cout << std::endl;
 }
