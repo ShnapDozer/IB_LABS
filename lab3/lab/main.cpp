@@ -1,9 +1,8 @@
-#include <QCoreApplication>
-#include <QDebug>
-
 #include <iostream>
 #include <fstream>
 #include <vector>
+
+#include "common.h"
 
 struct RGBQUAD {
     char rgbBlue;
@@ -12,25 +11,29 @@ struct RGBQUAD {
     char rgbReserved;
 };
 
-typedef uint32_t DWORD; // Двойное слово - 32 бита (разряда)
+typedef int32_t DWORD; // Двойное слово - 32 бита (разряда)
 typedef uint16_t WORD; // Слово - 16 бит (разрядов)
 typedef int32_t LONG;
 
 struct BMPHeader {
-    WORD type;
+    WORD  type;
     DWORD size;
     DWORD reserved;
     DWORD offset;
+
     DWORD dib_size;
-    LONG width;
-    LONG height;
-    WORD planes;
-    WORD bpp;
+    DWORD width;
+    DWORD height;
+    WORD  planes;
+    WORD  bpp;
     DWORD compression;
+
     DWORD image_size;
-    LONG x_ppm;
-    LONG y_ppm;
+
+    DWORD x_ppm;
+    DWORD y_ppm;
     DWORD colors;
+
     DWORD important;
 };
 
@@ -101,29 +104,43 @@ uint8_t read_hidden_byte(const RGBQUAD &pixel) {
      return hiddenByte;
 }
 
-void write_bmp_file(BMP_file file){
-    FILE* outStream = fopen(file.path.c_str(), "wb");
+void write_bmp_file(BMP_file file, std::string data){
+
+    FILE* inStream = fopen("../6.bmp", "rb");
+    FILE* outStream = fopen("../6_1.bmp", "wb");
+
+    int readBytes = -1;
+    const int SIZE = 100000;
+    char* rbuffer = new char[SIZE];
+
     if(!outStream) {
         printf("Error: could not open file %s\n", file.path.c_str());
         return;
     }
 
-    fwrite(&file.header, sizeof(BMPHeader), 1, outStream);
-    fwrite(file.data, sizeof(RGBQUAD), file.dataSize, outStream);
+    while ((readBytes = fread(rbuffer, sizeof(char), SIZE, inStream)) > 0) {
+        fwrite(rbuffer, sizeof(char), readBytes, outStream);
+    }
 
+//    fwrite(&file.header, sizeof(BMPHeader), 1, outStream);
+//    fwrite(file.data, sizeof(RGBQUAD), file.dataSize, outStream);
 
+    fclose(inStream);
     fclose(outStream);
 }
 
 
 int main(int argc, char *argv[])
 {
-    auto r = read_bmp_file("./6.bmp");
+    BMP_file r = read_bmp_file("../6.bmp");
+    std::cout << r.header.width;
     for(int i = 0; i < r.dataSize; ++i) {
-        std::cout << read_hidden_byte(r.data[i]);
+        read_hidden_byte(r.data[i]);
+        std::cout << f_data[i % f_data.size()];
+
     }
 
-    write_bmp_file(r);
+    write_bmp_file(r, f_data);
 
 //    std::cout << r.dataSize << " " << sizeof(RGBQUAD) <<  std::endl;
     return 0;
