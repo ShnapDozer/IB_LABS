@@ -1,6 +1,7 @@
 #include <QCoreApplication>
 #include <stdio.h>
 #include <stdint.h>
+#include <iostream>
 
 #define BUFF_SIZE 1024
 
@@ -231,6 +232,10 @@ int main(int argc, char *argv[]) {
     length = blowfish(decrypted, 'D', __Keys32b, encrypted, length);
     print_array(decrypted, length);
 
+    for(int i = 0; i < length; ++i){
+        std::cout << char(decrypted[i]);
+    }
+
     QCoreApplication a(argc, argv);
     return a.exec();
 }
@@ -376,7 +381,7 @@ static inline void swap(uint32_t * N1, uint32_t * N2) {
 static inline void print_array(uint8_t * array, size_t length) {
     printf("[ ");
     for (size_t i = 0; i < length; ++i)
-        printf("%d ", array[i]);
+        printf("%c ", array[i]);
     printf("]\n");
 }
 
